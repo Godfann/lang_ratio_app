@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Script Language Ratio Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+    header p {
+      margin-top: 8px;
+      color: #6b7280;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+      padding: 36px;
+      width: 100%;
+      max-width: 640px;
+    }
+
+    /* ── Drop Zone ── */
+    #dropzone {
+      border: 2px dashed #d1d5db;
+      border-radius: 12px;
+      padding: 48px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+    #dropzone.dragover { border-color: #4f46e5; background: #eef2ff; }
+    #dropzone input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    #dropzone .icon {
+      font-size: 3rem;
+      margin-bottom: 12px;
+    }
+    #dropzone .label {
+      font-weight: 600;
+      font-size: 1rem;
+      color: #374151;
+    }
+    #dropzone .sublabel {
+      margin-top: 6px;
+      font-size: 0.82rem;
+      color: #9ca3af;
+    }
+
+    /* file name badge */
+    #file-badge {
+      display: none;
+      margin-top: 14px;
+      background: #f3f4f6;
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 0.88rem;
+      color: #374151;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #file-badge .fname { font-weight: 600; flex: 1; word-break: break-all; }
+    #file-badge .remove {
+      cursor: pointer; color: #9ca3af; font-size: 1.1rem; line-height: 1;
+      border: none; background: none; padding: 0;
+    }
+    #file-badge.hidden { display: none; }
+
+    /* ── Analyze Button ── */
+    #analyze-btn {
+      margin-top: 24px;
+      width: 100%;
+      padding: 14px;
+      background: #4f46e5;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+    }
+    #analyze-btn:hover:not(:disabled) { background: #4338ca; }
+    #analyze-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    /* ── Progress ── */
+    #progress-area {
+      display: none;
+      margin-top: 24px;
+    }
+    .progress-bar-wrap {
+      height: 8px;
+      background: #e5e7eb;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: #4f46e5;
+      border-radius: 99px;
+      width: 0%;
+      transition: width 0.4s ease;
+    }
+    #progress-label {
+      margin-top: 8px;
+      font-size: 0.85rem;
+      color: #6b7280;
+      text-align: center;
+    }
+
+    /* ── Results ── */
+    #results-area {
+      display: none;
+      margin-top: 28px;
+    }
+    #results-area h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #374151;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: #f9fafb;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .stat-card .sc-label { font-size: 0.75rem; color: #9ca3af; text-transform: uppercase; letter-spacing: .05em; }
+    .stat-card .sc-value { font-size: 1.4rem; font-weight: 700; margin-top: 4px; color: #1a1a2e; }
+    .stat-card .sc-sub { font-size: 0.8rem; color: #6b7280; margin-top: 2px; }
+
+    /* ratio bars */
+    .ratio-section { margin-bottom: 20px; }
+    .ratio-row { margin-bottom: 12px; }
+    .ratio-header { display: flex; justify-content: space-between; font-size: 0.88rem; margin-bottom: 5px; }
+    .ratio-header .lang { font-weight: 600; }
+    .ratio-header .pct { color: #4f46e5; font-weight: 600; }
+    .ratio-bar-bg { height: 10px; background: #e5e7eb; border-radius: 99px; overflow: hidden; }
+    .ratio-bar-fill { height: 100%; background: #4f46e5; border-radius: 99px; }
+    .ratio-bar-fill.secondary { background: #a78bfa; }
+
+    /* table */
+    .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid #e5e7eb; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    thead tr { background: #f3f4f6; }
+    th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
+    th { font-weight: 600; color: #374151; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .04em; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+
+    /* ── Download Buttons ── */
+    .download-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .dl-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+    .dl-btn:hover { opacity: 0.85; }
+    .dl-excel { background: #16a34a; color: #fff; }
+    .dl-pdf   { background: #dc2626; color: #fff; }
+
+    /* ── Error ── */
+    #error-area {
+      display: none;
+      margin-top: 20px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 0.88rem;
+      color: #b91c1c;
+    }
+
+    /* ── Reset ── */
+    #reset-btn {
+      display: none;
+      margin-top: 16px;
+      width: 100%;
+      padding: 12px;
+      background: #f3f4f6;
+      color: #374151;
+      font-size: 0.9rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    #reset-btn:hover { background: #e5e7eb; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Language Ratio Analyzer</h1>
+  <p>Upload a tagged script file (.txt) to analyze language distribution</p>
+</header>
+
+<div class="card">
+  <!-- Drop Zone -->
+  <div id="dropzone">
+    <input type="file" id="file-input" accept=".docx,.doc,.txt,.text" />
+    <div class="icon">📄</div>
+    <div class="label">Drop your script file here</div>
+    <div class="sublabel">or click to browse &nbsp;·&nbsp; DOCX, DOC, TXT files supported</div>
+  </div>
+
+  <div id="file-badge" class="hidden">
+    <span>📄</span>
+    <span class="fname" id="badge-name"></span>
+    <button class="remove" id="remove-file" title="Remove">✕</button>
+  </div>
+
+  <button id="analyze-btn" disabled>Initiate Analysing</button>
+
+  <!-- Progress -->
+  <div id="progress-area">
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progress-fill"></div>
+    </div>
+    <div id="progress-label">Uploading…</div>
+  </div>
+
+  <!-- Error -->
+  <div id="error-area"></div>
+
+  <!-- Results -->
+  <div id="results-area">
+    <h2>Analysis Results</h2>
+
+    <div class="summary-grid">
+      <div class="stat-card">
+        <div class="sc-label">Total Words</div>
+        <div class="sc-value" id="stat-total-words">—</div>
+        <div class="sc-sub">across all languages</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">Primary Language</div>
+        <div class="sc-value" id="stat-primary-lang">—</div>
+        <div class="sc-sub" id="stat-primary-pct">—</div>
+      </div>
+    </div>
+
+    <div class="ratio-section" id="ratio-bars"></div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Language</th>
+            <th>Code</th>
+            <th>Words</th>
+            <th>Ratio %</th>
+          </tr>
+        </thead>
+        <tbody id="results-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="download-row">
+      <a id="dl-excel" class="dl-btn dl-excel" href="#" download>
+        <span>📊</span> Download Excel
+      </a>
+      <a id="dl-pdf" class="dl-btn dl-pdf" href="#" download>
+        <span>📄</span> Download PDF
+      </a>
+    </div>
+  </div>
+
+  <button id="reset-btn">↩ Analyze Another File</button>
+</div>
+
+<script>
+  const dropzone   = document.getElementById('dropzone');
+  const fileInput  = document.getElementById('file-input');
+  const fileBadge  = document.getElementById('file-badge');
+  const badgeName  = document.getElementById('badge-name');
+  const removeFile = document.getElementById('remove-file');
+  const analyzeBtn = document.getElementById('analyze-btn');
+  const progressArea = document.getElementById('progress-area');
+  const progressFill = document.getElementById('progress-fill');
+  const progressLabel = document.getElementById('progress-label');
+  const resultsArea  = document.getElementById('results-area');
+  const errorArea    = document.getElementById('error-area');
+  const resetBtn     = document.getElementById('reset-btn');
+
+  let selectedFile = null;
+  let lastJobId = null;
+
+  // ── File selection ──
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) setFile(fileInput.files[0]);
+  });
+
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
+  });
+
+  function setFile(file) {
+    selectedFile = file;
+    badgeName.textContent = file.name;
+    fileBadge.classList.remove('hidden');
+    analyzeBtn.disabled = false;
+    clearResults();
+  }
+
+  removeFile.addEventListener('click', () => {
+    selectedFile = null;
+    fileInput.value = '';
+    fileBadge.classList.add('hidden');
+    analyzeBtn.disabled = true;
+    clearResults();
+  });
+
+  function clearResults() {
+    errorArea.style.display = 'none';
+    resultsArea.style.display = 'none';
+    progressArea.style.display = 'none';
+    resetBtn.style.display = 'none';
+    progressFill.style.width = '0%';
+  }
+
+  // ── Analyze ──
+  analyzeBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+    analyzeBtn.disabled = true;
+    clearResults();
+    progressArea.style.display = 'block';
+    setProgress(10, 'Uploading audio…');
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    let data;
+    try {
+      setProgress(30, 'Processing audio…');
+      const resp = await fetch('/analyze', { method: 'POST', body: formData });
+      setProgress(70, 'Generating output files…');
+      data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Server error');
+    } catch (err) {
+      showError(err.message);
+      analyzeBtn.disabled = false;
+      return;
+    }
+
+    setProgress(100, 'Done!');
+    setTimeout(() => {
+      progressArea.style.display = 'none';
+      renderResults(data);
+      analyzeBtn.disabled = false;
+      resetBtn.style.display = 'block';
+    }, 500);
+  });
+
+  function setProgress(pct, label) {
+    progressFill.style.width = pct + '%';
+    progressLabel.textContent = label;
+  }
+
+  // ── Render Results ──
+  function renderResults(data) {
+    const { file_name, results, total_words, job_id } = data;
+    lastJobId = job_id;
+
+    document.getElementById('stat-total-words').textContent = total_words.toLocaleString();
+    const primary = results[0];
+    document.getElementById('stat-primary-lang').textContent = primary ? primary.language_name : '—';
+    document.getElementById('stat-primary-pct').textContent  = primary ? primary.ratio_percent + '% of content' : '';
+
+    // ratio bars
+    const barContainer = document.getElementById('ratio-bars');
+    barContainer.innerHTML = '';
+    results.slice(0, 5).forEach((r, i) => {
+      barContainer.innerHTML += `
+        <div class="ratio-row">
+          <div class="ratio-header">
+            <span class="lang">${r.language_name} <span style="color:#9ca3af;font-weight:400">(${r.language_code})</span></span>
+            <span class="pct">${r.ratio_percent}%</span>
+          </div>
+          <div class="ratio-bar-bg">
+            <div class="ratio-bar-fill ${i > 0 ? 'secondary' : ''}" style="width:${r.ratio_percent}%"></div>
+          </div>
+        </div>`;
+    });
+
+    // table
+    const tbody = document.getElementById('results-tbody');
+    tbody.innerHTML = '';
+    results.forEach(r => {
+      tbody.innerHTML += `
+        <tr>
+          <td>${r.language_name}</td>
+          <td><code>${r.language_code}</code></td>
+          <td>${r.word_count.toLocaleString()}</td>
+          <td>${r.ratio_percent}%</td>
+        </tr>`;
+    });
+
+    // download links
+    document.getElementById('dl-excel').href = `/download/${job_id}/excel`;
+    document.getElementById('dl-pdf').href   = `/download/${job_id}/pdf`;
+    document.getElementById('dl-excel').download = `${file_name}_language_ratio.xlsx`;
+    document.getElementById('dl-pdf').download   = `${file_name}_language_ratio.pdf`;
+
+    resultsArea.style.display = 'block';
+  }
+
+  function showError(msg) {
+    progressArea.style.display = 'none';
+    errorArea.textContent = '⚠️ ' + msg;
+    errorArea.style.display = 'block';
+    resetBtn.style.display = 'block';
+  }
+
+  // ── Reset ──
+  resetBtn.addEventListener('click', () => {
+    selectedFile = null;
+    fileInput.value = '';
+    fileBadge.classList.add('hidden');
+    analyzeBtn.disabled = true;
+    clearResults();
+    resetBtn.style.display = 'none';
+  });
+</script>
+</body>
+</html>

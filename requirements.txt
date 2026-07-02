@@ -1,0 +1,10 @@
+flask
+openpyxl
+reportlab
+werkzeug
+regex
+janome
+jieba
+pythainlp
+lingua-language-detector
+python-docx
