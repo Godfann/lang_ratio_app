@@ -8,3 +8,4 @@ jieba
 pythainlp
 lingua-language-detector
 python-docx
+gunicorn

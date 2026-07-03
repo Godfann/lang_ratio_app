@@ -23,6 +23,9 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['OUTPUT_FOLDER'] = 'outputs'
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB
 
+os.makedirs('uploads', exist_ok=True)
+os.makedirs('outputs', exist_ok=True)
+
 ALLOWED_EXTENSIONS = {'docx', 'doc', 'txt', 'text'}
 
 _job_store = {}
@@ -715,6 +718,4 @@ def download(job_id, fmt):
 
 
 if __name__ == '__main__':
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
     app.run(debug=True, port=5050)
